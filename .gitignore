@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# data & outputs
+/data/raw/
+/data/cleaned/
+/data/chunks/
+/data/embeddings/
+/outputs/
