@@ -1,0 +1,14 @@
+# LoRA quick-run configuration (示例)
+model: ollama://DeepSeek-R1-1.5B
+train:
+  micro_batch_size: 4
+  gradient_accumulation_steps: 8
+  epochs: 1
+  learning_rate: 2e-4
+  warmup_steps: 100
+lora:
+  r: 8
+  alpha: 32
+  dropout: 0.05
+  target_modules: ["q_proj", "v_proj"]
+output_dir: outputs/models/lora-quick

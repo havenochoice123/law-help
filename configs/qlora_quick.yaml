@@ -1,0 +1,17 @@
+# QLoRA quick-run configuration (示例)
+model: ollama://DeepSeek-R1-1.5B
+train:
+  micro_batch_size: 4
+  gradient_accumulation_steps: 8
+  epochs: 1
+  learning_rate: 1e-4
+  warmup_steps: 100
+qlora:
+  bnb_4bit: true
+  quant_type: nf4
+  compute_dtype: float16
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+output_dir: outputs/models/qlora-quick
