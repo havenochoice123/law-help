@@ -31,7 +31,10 @@ python scripts/index_build.py --embeddings outputs/embeddings.jsonl --out output
 4. 运行 LoRA quick-run（展示命令，不强制执行训练）：
 
 ```powershell
+python scripts/train_lora_quick.py --config configs/lora_quick.yaml --dry-run
 python scripts/train_lora_quick.py --config configs/lora_quick.yaml
+python scripts/train_qlora_quick.py --config configs/qlora_quick.yaml --dry-run
+python scripts/verify_adapter.py --adapter-dir outputs/models/lora-quick
 ```
 
 5. 启动 RAG demo：
@@ -80,7 +83,9 @@ epochs = 1（quick）, full: 3
 lr = 1e-4  
 lora_r = 16 可选  
 LLaMA-Factory 快速训练示例（powershell）：  
-llama-factory train --config configs/lora_quick.yaml --model ollama://DeepSeek-R1-1.5B --output outputs/models/lora-quick  
+python scripts/train_lora_quick.py --config configs/lora_quick.yaml --dry-run  
+python scripts/train_lora_quick.py --config configs/lora_quick.yaml  
+python scripts/train_qlora_quick.py --config configs/qlora_quick.yaml  
 混合检索最小实现路径（优先快速可复现）  
 轻量方案（快速上线）：  
 BM25：Whoosh（纯 Python）或 Elasticsearch（如果已有服务）  
@@ -138,7 +143,9 @@ python scripts/data_prep.py --from-disc-law-sft data/raw/disc_law_sft.jsonl --ou
 python scripts/build_embeddings.py --input data/chunks/ --embed-model bge-small --out outputs/embeddings/  
 python scripts/index_build.py --embeddings outputs/embeddings/ --out outputs/indexes/  
 LoRA quick-run：  
-llama-factory train --config configs/lora_quick.yaml --model ollama://DeepSeek-R1-1.5B --output outputs/models/lora-quick  
+python scripts/train_lora_quick.py --config configs/lora_quick.yaml  
+python scripts/train_qlora_quick.py --config configs/qlora_quick.yaml  
+python scripts/verify_adapter.py --adapter-dir outputs/models/lora-quick  
 启动 RAG demo（本地 FastAPI）：  
 python scripts/rag_demo.py --model outputs/models/lora-quick --index outputs/indexes/ --port 8000  
 向 demo 发送请求（curl/wget 或浏览器）检查返回结果。  
