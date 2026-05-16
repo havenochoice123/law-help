@@ -12,5 +12,8 @@ Thumbs.db
 /data/raw/
 /data/cleaned/
 /data/chunks/
+/data/finetune/
+/data/knowledge_chunks/
 /data/embeddings/
+/data/eval/
 /outputs/
