@@ -1,0 +1,2 @@
+1. 运行data_prep.py 将实验数据准备好（到data/chunks)
+2. 运行train.py 进行训练，训练好的模型会保存在checkpoints文件夹下
