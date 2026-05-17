@@ -1,6 +1,7 @@
 """Score generated answers with BLEU-4 and ROUGE-L."""
 import argparse
 import json
+import re
 from pathlib import Path
 
 try:
@@ -59,6 +60,16 @@ def rouge_l(predictions: list[str], references: list[str]) -> float:
     return float(sum(scores) / len(scores)) if scores else 0.0
 
 
+def count_cited_answers(predictions: list[str]) -> int:
+    citation_pattern = re.compile(r"\[S\d+\]|引用片段")
+    return sum(1 for item in predictions if citation_pattern.search(item))
+
+
+def count_english_answers(predictions: list[str]) -> int:
+    english_pattern = re.compile(r"[A-Za-z]{4,}")
+    return sum(1 for item in predictions if english_pattern.search(item))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Score rag_compare JSONL outputs.")
     parser.add_argument("--input", default=str(DEFAULT_INPUT), help="Comparison JSONL file.")
@@ -84,6 +95,9 @@ def main() -> int:
             "bleu4": corpus_bleu(predictions, references),
             "rouge_l": rouge_l(predictions, references),
             "non_empty": sum(1 for item in predictions if item.strip()),
+            "cited_answers": count_cited_answers(predictions),
+            "english_fragment_answers": count_english_answers(predictions),
+            "avg_chars": float(sum(len(item) for item in predictions) / len(predictions)) if predictions else 0.0,
         }
 
     out_path = resolve_path(args.out)

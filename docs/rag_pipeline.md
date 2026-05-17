@@ -96,3 +96,7 @@ Score generated answers:
 ```powershell
 python scripts/score_generations.py --input outputs/eval/rag_compare.jsonl --out outputs/eval/rag_compare_scores.json
 ```
+
+The score summary includes BLEU-4, ROUGE-L, non-empty answer count, cited answer
+count, English-fragment answer count, and average answer length. These fields
+are intended for the project report's comparison of LoRA, RAG, and LoRA + RAG.
