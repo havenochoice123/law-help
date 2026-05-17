@@ -23,6 +23,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INDEX_DIR = PROJECT_ROOT / "outputs" / "indexes"
 WEB_DIR = PROJECT_ROOT / "web" / "rag_demo"
 CITATION_RE = re.compile(r"\[S\d+\]")
+SELF_DEFENSE_TERMS = ("正当防卫", "防卫过当", "被抢劫后", "犯罪人杀死", "被害后杀死")
+SELF_DEFENSE_EVIDENCE_TERMS = ("正当防卫", "防卫过当", "第二十条")
 
 
 class AskRequest(BaseModel):
@@ -42,6 +44,19 @@ def ensure_context_citations(answer: str | None, contexts: list[dict]) -> str | 
         return answer
     citations = " ".join(f"[S{index}]" for index in range(1, citation_count + 1))
     return f"{answer.rstrip()}\n\n引用片段：{citations}"
+
+
+def build_evidence_warning(question: str, contexts: list[dict]) -> str | None:
+    context_text = "\n".join(str(item.get("text", "")) for item in contexts)
+    if any(term in question for term in SELF_DEFENSE_TERMS) and not any(
+        term in context_text for term in SELF_DEFENSE_EVIDENCE_TERMS
+    ):
+        return (
+            "当前知识库无法确认该问题的完整判决结论：案件涉及被抢劫后杀死犯罪人，"
+            "需要检索到正当防卫/防卫过当相关法条（如《刑法》第二十条）才能进行可靠三段论推理。"
+            "当前返回的片段缺少该依据，因此不应直接认定故意杀人罪或给出刑罚。"
+        )
+    return None
 
 
 def create_app(
@@ -94,8 +109,9 @@ def create_app(
             contexts = retriever.search(request.question, top_k=request.top_k)
         prompt = build_rag_prompt(request.question, contexts)
         messages = build_rag_messages(request.question, contexts)
-        answer = None
-        if model is not None:
+        evidence_warning = build_evidence_warning(request.question, contexts)
+        answer = evidence_warning
+        if model is not None and evidence_warning is None:
             answer = generate_answer(
                 tokenizer,
                 model,
@@ -109,6 +125,7 @@ def create_app(
         return {
             "question": request.question,
             "answer": answer,
+            "evidence_warning": evidence_warning,
             "prompt": prompt,
             "contexts": contexts,
         }
