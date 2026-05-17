@@ -58,3 +58,41 @@ Endpoints:
 
 `/ask` currently returns the prompt and contexts. The next integration step is
 to connect this prompt to the loaded LoRA adapter for answer generation.
+
+To load the LoRA adapter in the API:
+
+```powershell
+python scripts/rag_demo.py --index outputs/indexes --adapter-dir outputs/models/lora-full --load-generator --port 8000
+```
+
+## Offline Comparison
+
+Generate a small comparison file first:
+
+```powershell
+python scripts/compare_rag.py --limit 5 --modes lora,rag,lora_rag --out outputs/eval/rag_compare.jsonl
+```
+
+For `DeepSeek-R1-Distill-Qwen-*`, train adapters with the LLaMA-Factory
+`deepseekr1` template. A `qwen` template adapter may pass file/load checks but
+can produce incoherent generations during inference.
+
+The modes are:
+
+- `base`: base model without retrieved context
+- `lora`: LoRA model without retrieved context
+- `rag`: base model with retrieved context
+- `lora_rag`: LoRA model with retrieved context
+
+For lower memory usage, run one model family at a time:
+
+```powershell
+python scripts/compare_rag.py --limit 20 --modes rag --out outputs/eval/rag_base.jsonl
+python scripts/compare_rag.py --limit 20 --modes lora,lora_rag --out outputs/eval/rag_lora.jsonl
+```
+
+Score generated answers:
+
+```powershell
+python scripts/score_generations.py --input outputs/eval/rag_compare.jsonl --out outputs/eval/rag_compare_scores.json
+```

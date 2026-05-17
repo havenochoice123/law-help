@@ -137,6 +137,7 @@ def main() -> int:
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(LLAMA_FACTORY_DIR / "src") + os.pathsep + env.get("PYTHONPATH", "")
+    env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     return_code = stream_process(command, cwd=LLAMA_FACTORY_DIR, env=env, log_file=log_file)
     print(f"\nTraining process exited with code {return_code}")
     print(f"Log file: {log_file}")
