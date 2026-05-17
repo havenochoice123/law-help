@@ -14,18 +14,6 @@ TOKEN_RE = re.compile(r"[\u4e00-\u9fff]{1}|[A-Za-z0-9_]+")
 CRIME_RE = re.compile(r"[\u4e00-\u9fff]{2,16}罪")
 LEGAL_QUERY_RULES = [
     (
-        ("正当防卫", "防卫过当", "被抢劫后", "犯罪人杀死", "被害后杀死"),
-        "正当防卫 第二十条 防卫过当 正在进行 行凶 杀人 抢劫",
-    ),
-    (
-        ("杀死", "杀人", "砍杀", "杀害", "死亡", "故意杀人"),
-        "故意杀人罪 第二百三十二条 杀人 死亡 情节较轻",
-    ),
-    (
-        ("抢劫", "劫取", "暴力", "胁迫"),
-        "抢劫罪 第二百六十三条 暴力 胁迫 抢劫公私财物",
-    ),
-    (
         ("卷烟", "烟草", "假烟", "伪劣卷烟", "软中华", "专卖"),
         "非法经营罪 第二百二十五条 烟草 专卖 违反国家规定 扰乱市场秩序",
     ),
@@ -258,7 +246,7 @@ class HybridRetriever:
                     secondary.append(item)
                 kept_for_query += 1
 
-        ranked = sorted(primary + secondary, key=lambda item: item["score"], reverse=True)
+        ranked = primary + sorted(secondary, key=lambda item: item["score"], reverse=True)
         return ranked[:top_k]
 
 
