@@ -17,3 +17,12 @@ Thumbs.db
 /data/embeddings/
 /data/eval/
 /outputs/
+
+# local external repos and model artifacts
+/LLaMA-Factory/
+/model/**/model.safetensors
+/model/**/tokenizer_backup_bad/
+/model/**/.gitattributes
+/model/**/*.bin
+/model/**/*.pt
+/model/**/*.pth

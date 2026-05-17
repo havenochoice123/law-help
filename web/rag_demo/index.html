@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>法律 RAG 问答演示</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --text: #20242c;
+      --muted: #687080;
+      --line: #d9dee8;
+      --accent: #1f6feb;
+      --accent-dark: #174ea6;
+      --warn: #8a5a00;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    header {
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.25fr);
+      gap: 18px;
+      padding: 18px;
+      max-width: 1360px;
+      margin: 0 auto;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    textarea {
+      width: 100%;
+      min-height: 240px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      color: var(--text);
+      font: 14px/1.55 "Microsoft YaHei", "Segoe UI", sans-serif;
+      outline: none;
+    }
+    textarea:focus,
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.12);
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    input {
+      width: 100%;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 14px;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    button {
+      height: 40px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 14px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #e9eef8;
+      color: var(--accent-dark);
+    }
+    button:disabled {
+      opacity: 0.62;
+      cursor: wait;
+    }
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .answer {
+      min-height: 150px;
+      white-space: pre-wrap;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      background: #fbfcff;
+      font-size: 14px;
+    }
+    .empty {
+      color: var(--warn);
+    }
+    .context-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .context {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+    .context-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .context-text {
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-size: 13px;
+    }
+    details {
+      margin-top: 14px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+    summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    pre {
+      overflow: auto;
+      max-height: 300px;
+      padding: 12px;
+      border-radius: 6px;
+      background: #111827;
+      color: #eef2ff;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      textarea {
+        min-height: 180px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>法律领域 LoRA + RAG 问答演示</h1>
+  </header>
+  <main>
+    <section>
+      <label for="question">案件问题</label>
+      <textarea id="question">根据案件信息，预测下列案件的最终裁决。被告人王某明知部分药品是假药仍在保健品店销售。经食品药品监督管理部门认定，上述药品均应按假药论处。请按照法律三段论推理并给出判决结果。</textarea>
+      <div class="controls">
+        <div>
+          <label for="topK">检索片段数</label>
+          <input id="topK" type="number" min="1" max="8" value="5">
+        </div>
+        <div>
+          <label for="maxTokens">最大生成长度</label>
+          <input id="maxTokens" type="number" min="32" max="512" value="180">
+        </div>
+      </div>
+      <div class="actions">
+        <button id="askBtn">生成回答</button>
+        <button id="retrieveBtn" class="secondary">仅检索</button>
+        <span id="status" class="status">正在检查服务状态...</span>
+      </div>
+    </section>
+    <section>
+      <label>模型回答</label>
+      <div id="answer" class="answer empty">等待输入。</div>
+      <div id="contexts" class="context-list"></div>
+      <details>
+        <summary>查看 RAG Prompt</summary>
+        <pre id="prompt"></pre>
+      </details>
+    </section>
+  </main>
+  <script>
+    const statusEl = document.getElementById("status");
+    const answerEl = document.getElementById("answer");
+    const contextsEl = document.getElementById("contexts");
+    const promptEl = document.getElementById("prompt");
+    const askBtn = document.getElementById("askBtn");
+    const retrieveBtn = document.getElementById("retrieveBtn");
+
+    function requestBody() {
+      return {
+        question: document.getElementById("question").value.trim(),
+        top_k: Number(document.getElementById("topK").value || 5),
+        max_new_tokens: Number(document.getElementById("maxTokens").value || 180),
+        expand_query: true
+      };
+    }
+
+    function setBusy(isBusy) {
+      askBtn.disabled = isBusy;
+      retrieveBtn.disabled = isBusy;
+      statusEl.textContent = isBusy ? "处理中..." : "就绪";
+    }
+
+    function renderContexts(contexts) {
+      contextsEl.innerHTML = "";
+      contexts.forEach((item, index) => {
+        const block = document.createElement("article");
+        block.className = "context";
+        const title = document.createElement("div");
+        title.className = "context-title";
+        title.innerHTML = `<span>[S${index + 1}] ${item.title || item.id}</span><span>score=${item.score ?? ""}</span>`;
+        const text = document.createElement("div");
+        text.className = "context-text";
+        text.textContent = item.text || "";
+        block.append(title, text);
+        contextsEl.appendChild(block);
+      });
+    }
+
+    async function postJson(path, body) {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) {
+        throw new Error(`${response.status} ${response.statusText}`);
+      }
+      return response.json();
+    }
+
+    async function runAsk() {
+      const body = requestBody();
+      if (!body.question) {
+        answerEl.textContent = "请输入案件问题。";
+        answerEl.className = "answer empty";
+        return;
+      }
+      setBusy(true);
+      try {
+        const data = await postJson("/ask", body);
+        answerEl.textContent = data.answer || "当前服务未加载生成模型，仅返回检索结果。启动时加入 --load-generator 可生成答案。";
+        answerEl.className = data.answer ? "answer" : "answer empty";
+        promptEl.textContent = data.prompt || "";
+        renderContexts(data.contexts || []);
+      } catch (error) {
+        answerEl.textContent = `请求失败：${error.message}`;
+        answerEl.className = "answer empty";
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function runRetrieve() {
+      const body = requestBody();
+      if (!body.question) {
+        answerEl.textContent = "请输入案件问题。";
+        answerEl.className = "answer empty";
+        return;
+      }
+      setBusy(true);
+      try {
+        const data = await postJson("/retrieve", body);
+        answerEl.textContent = "已完成检索，未调用生成模型。";
+        answerEl.className = "answer";
+        promptEl.textContent = "";
+        renderContexts(data.contexts || []);
+      } catch (error) {
+        answerEl.textContent = `请求失败：${error.message}`;
+        answerEl.className = "answer empty";
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function checkHealth() {
+      try {
+        const response = await fetch("/health");
+        const data = await response.json();
+        statusEl.textContent = data.generator_loaded
+          ? `就绪：已加载生成模型，知识片段 ${data.documents}`
+          : `就绪：仅检索模式，知识片段 ${data.documents}`;
+      } catch (error) {
+        statusEl.textContent = "服务未连接";
+      }
+    }
+
+    askBtn.addEventListener("click", runAsk);
+    retrieveBtn.addEventListener("click", runRetrieve);
+    checkHealth();
+  </script>
+</body>
+</html>

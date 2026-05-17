@@ -1,8 +1,12 @@
 """Minimal FastAPI RAG demo using the local hybrid retriever."""
 import argparse
+import re
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 try:
@@ -17,6 +21,8 @@ except ImportError:
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INDEX_DIR = PROJECT_ROOT / "outputs" / "indexes"
+WEB_DIR = PROJECT_ROOT / "web" / "rag_demo"
+CITATION_RE = re.compile(r"\[S\d+\]")
 
 
 class AskRequest(BaseModel):
@@ -28,6 +34,16 @@ class AskRequest(BaseModel):
     expand_query: bool = True
 
 
+def ensure_context_citations(answer: str | None, contexts: list[dict]) -> str | None:
+    if answer is None or not answer.strip() or CITATION_RE.search(answer):
+        return answer
+    citation_count = min(3, len(contexts))
+    if citation_count <= 0:
+        return answer
+    citations = " ".join(f"[S{index}]" for index in range(1, citation_count + 1))
+    return f"{answer.rstrip()}\n\n引用片段：{citations}"
+
+
 def create_app(
     index_dir: str | Path = DEFAULT_INDEX_DIR,
     base_model: str | Path = DEFAULT_BASE_MODEL,
@@ -35,10 +51,24 @@ def create_app(
     load_generator: bool = False,
 ) -> FastAPI:
     app = FastAPI(title="ClassDesign RAG Demo")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    if WEB_DIR.exists():
+        app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
+
     retriever = HybridRetriever(index_dir)
     tokenizer = model = None
     if load_generator:
         tokenizer, model = load_model(base_model, adapter_dir=adapter_dir)
+
+    @app.get("/")
+    def index() -> FileResponse:
+        return FileResponse(WEB_DIR / "index.html")
 
     @app.get("/health")
     def health() -> dict:
@@ -75,6 +105,7 @@ def create_app(
                 repetition_penalty=request.repetition_penalty,
                 no_repeat_ngram_size=request.no_repeat_ngram_size,
             )
+            answer = ensure_context_citations(answer, contexts)
         return {
             "question": request.question,
             "answer": answer,
