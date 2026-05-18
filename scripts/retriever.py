@@ -11,6 +11,37 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INDEX_DIR = PROJECT_ROOT / "outputs" / "indexes"
 TOKEN_RE = re.compile(r"[\u4e00-\u9fff]{1}|[A-Za-z0-9_]+")
+CRIME_RE = re.compile(r"[\u4e00-\u9fff]{2,16}罪")
+LEGAL_QUERY_RULES = [
+    (
+        ("卷烟", "烟草", "假烟", "伪劣卷烟", "软中华", "专卖"),
+        "非法经营罪 第二百二十五条 烟草 专卖 违反国家规定 扰乱市场秩序",
+    ),
+    (
+        ("毒品", "冰毒", "甲基苯丙胺", "海洛因", "鸦片"),
+        "非法持有毒品罪 第三百四十八条 贩卖毒品罪 第三百四十七条 甲基苯丙胺",
+    ),
+    (
+        ("假冒注册商标", "注册商标"),
+        "假冒注册商标罪 第二百一十三条",
+    ),
+    (
+        ("信用卡", "套现", "催收", "恶意透支", "超过三个月"),
+        "信用卡诈骗罪 第一百九十六条 恶意透支 数额较大 五年以下有期徒刑",
+    ),
+    (
+        ("焚烧", "玉米秆", "火势", "失控", "森林火灾", "过火面积", "有林地"),
+        "失火罪 第一百一十五条 放火罪 过失 森林火灾 重大损失",
+    ),
+    (
+        ("假药", "米非司酮", "伟哥", "食品药品监督", "保健品店"),
+        "生产销售假药罪 第一百四十一条 销售假药 三年以下有期徒刑",
+    ),
+    (
+        ("罂粟", "种植", "毒品原植物", "铲除", "销毁"),
+        "非法种植毒品原植物罪 第三百五十一条 罂粟 五百株以上 三千株以下",
+    ),
+]
 
 
 def resolve_path(path: str) -> Path:
@@ -66,6 +97,31 @@ def minmax(scores: dict[int, float]) -> dict[int, float]:
     if math.isclose(low, high):
         return {key: 1.0 for key in scores}
     return {key: (value - low) / (high - low) for key, value in scores.items()}
+
+
+def build_legal_queries(query: str) -> list[str]:
+    queries = []
+    for terms, expansion in LEGAL_QUERY_RULES:
+        if any(term in query for term in terms):
+            queries.append(expansion)
+
+    crime_terms = []
+    for term in sorted(set(CRIME_RE.findall(query)), key=len, reverse=True):
+        if len(term) > 8 or "的" in term:
+            continue
+        crime_terms.append(term)
+    if crime_terms:
+        queries.append(" ".join(crime_terms))
+
+    queries.append(query)
+    deduped = []
+    seen = set()
+    for item in queries:
+        normalized = " ".join(item.split())
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            deduped.append(normalized)
+    return deduped
 
 
 class HybridRetriever:
@@ -162,6 +218,37 @@ class HybridRetriever:
             scored.append(row)
         return sorted(scored, key=lambda item: item["score"], reverse=True)[:top_k]
 
+    def search_expanded(
+        self,
+        query: str,
+        top_k: int = 5,
+        candidate_k: int = 50,
+        alpha: float = 0.25,
+        per_query_k: int = 3,
+    ) -> list[dict]:
+        primary = []
+        secondary = []
+        seen_texts = set()
+        for query_index, expanded_query in enumerate(build_legal_queries(query)):
+            results = self.search(expanded_query, top_k=per_query_k, candidate_k=candidate_k, alpha=alpha)
+            kept_for_query = 0
+            for result in results:
+                text_key = " ".join(result["text"].split())
+                if text_key in seen_texts:
+                    continue
+                seen_texts.add(text_key)
+                item = dict(result)
+                item["expanded_query"] = expanded_query
+                item["score"] = round(item["score"] + max(0, 0.02 - query_index * 0.002), 6)
+                if kept_for_query == 0:
+                    primary.append(item)
+                else:
+                    secondary.append(item)
+                kept_for_query += 1
+
+        ranked = primary + sorted(secondary, key=lambda item: item["score"], reverse=True)
+        return ranked[:top_k]
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Search the local hybrid RAG index.")
@@ -170,13 +257,17 @@ def main() -> int:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--candidate-k", type=int, default=50)
     parser.add_argument("--alpha", type=float, default=0.25, help="Vector weight in hybrid scoring.")
+    parser.add_argument("--no-expand", action="store_true", help="Disable legal query expansion.")
     args = parser.parse_args()
 
     if not args.query:
         raise ValueError("Please provide a query.")
 
     retriever = HybridRetriever(args.index)
-    results = retriever.search(args.query, top_k=args.top_k, candidate_k=args.candidate_k, alpha=args.alpha)
+    if args.no_expand:
+        results = retriever.search(args.query, top_k=args.top_k, candidate_k=args.candidate_k, alpha=args.alpha)
+    else:
+        results = retriever.search_expanded(args.query, top_k=args.top_k, candidate_k=args.candidate_k, alpha=args.alpha)
     for index, item in enumerate(results, start=1):
         print(f"[{index}] score={item['score']} id={item['id']} source={item.get('source', '')}")
         print(item["text"])
